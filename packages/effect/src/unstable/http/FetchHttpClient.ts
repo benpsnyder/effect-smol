@@ -1,9 +1,9 @@
 /**
  * @since 4.0.0
  */
+import * as Context from "../../Context.ts"
 import * as Effect from "../../Effect.ts"
 import type * as Layer from "../../Layer.ts"
-import * as ServiceMap from "../../ServiceMap.ts"
 import * as Stream from "../../Stream.ts"
 import * as Headers from "./Headers.ts"
 import * as HttpClient from "./HttpClient.ts"
@@ -14,7 +14,7 @@ import * as HttpClientResponse from "./HttpClientResponse.ts"
  * @since 4.0.0
  * @category tags
  */
-export const Fetch = ServiceMap.Reference<typeof globalThis.fetch>("effect/http/FetchHttpClient/Fetch", {
+export const Fetch = Context.Reference<typeof globalThis.fetch>("effect/http/FetchHttpClient/Fetch", {
   defaultValue: () => globalThis.fetch
 })
 
@@ -22,14 +22,17 @@ export const Fetch = ServiceMap.Reference<typeof globalThis.fetch>("effect/http/
  * @since 4.0.0
  * @category tags
  */
-export class RequestInit extends ServiceMap.Service<RequestInit, globalThis.RequestInit>()(
+export class RequestInit extends Context.Service<RequestInit, globalThis.RequestInit>()(
   "effect/http/FetchHttpClient/RequestInit"
 ) {}
 
 const fetch: HttpClient.HttpClient = HttpClient.make((request, url, signal, fiber) => {
   const fetch = fiber.getRef(Fetch)
-  const options: globalThis.RequestInit = fiber.services.mapUnsafe.get(RequestInit.key) ?? {}
-  const headers = options.headers ? Headers.merge(Headers.fromInput(options.headers), request.headers) : request.headers
+  const options: globalThis.RequestInit = fiber.context.mapUnsafe.get(RequestInit.key) ?? {}
+  let headers = options.headers ? Headers.merge(Headers.fromInput(options.headers), request.headers) : request.headers
+  if (headers["content-length"]) {
+    headers = Headers.remove(headers, "content-length")
+  }
   const send = (body: BodyInit | undefined) =>
     Effect.map(
       Effect.tryPromise({
@@ -68,4 +71,4 @@ const fetch: HttpClient.HttpClient = HttpClient.make((request, url, signal, fibe
  * @since 4.0.0
  * @category layers
  */
-export const layer: Layer.Layer<HttpClient.HttpClient> = HttpClient.layerMergedServices(Effect.succeed(fetch))
+export const layer: Layer.Layer<HttpClient.HttpClient> = HttpClient.layerMergedContext(Effect.succeed(fetch))
